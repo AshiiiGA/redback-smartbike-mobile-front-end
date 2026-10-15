@@ -4,58 +4,64 @@ import {
   SafeAreaView,
   Image,
   StatusBar,
-  TouchableWithoutFeedback,
-  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   TouchableOpacity,
+  Alert,
 } from "react-native";
-import React, { useState, useContext } from "react";
+import React, { useState } from "react";
 import "../../global.css";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import TextInputWithLogo from "@/components/TextInputWithLogo";
 import LoginIcon from "@/components/LoginIcon";
-import { Link, router, useNavigation } from "expo-router";
+import { Link, router } from "expo-router";
 import "@expo/metro-runtime";
 import { LinearGradient } from "expo-linear-gradient";
-import { AuthContext } from "@/context/authContext";
+import { useAuth } from "@/context/authContext";
 
 const index = () => {
-  const { setUser } = useContext(AuthContext);
-  const handleLogin = async () => {
-    // production code
-    // const response = await fetch(`http://0.0.0.0:8000/login/`, {
-    //   method: "POST",
-    //   headers: {
-    //     Accept: "application/json",
-    //     "Content-Type": "application/json",
-    //   },
-    //   body: JSON.stringify(loginData),
-    // });
-    // switch (response.status) {
-    //   case 404:
-    //     alert("Invalid credentials: email doesn't exist");
-    //     break;
-    //   case 401:
-    //     alert("Invalid credentials: incorrect password");
-    //     break;
-    //   case 200:
-    //     const data = await response.json();
-    //     setUser({
-    //       id: data.id,
-    //       username: data.account_details[0].username,
-    //       email: data.account_details[0].email,
-    //     });
-    //     router.replace("/home");
-    //     break;
-    // }
-    // dev code
-    router.replace("/home");
-  };
+  const { signIn, signInWithOAuth } = useAuth();
   const [loginData, setLoginData] = useState({ email: "", password: "" });
-  const navigation = useNavigation();
+
+  const handleLogin = async () => {
+    if (!loginData.email || !loginData.password) {
+      alert("Please enter both email and password");
+      return;
+    }
+
+    try {
+      const { error } = await signIn(loginData.email, loginData.password);
+
+      if (error) {
+        alert(error.message);
+        return;
+      }
+
+      router.replace("/(tabs)/home");
+    } catch (err) {
+      alert("Something went wrong while signing in");
+    }
+  };
+
+  const handleSocialLogin = async (provider) => {
+    try {
+      const { error } = await signInWithOAuth(provider);
+
+      if (error) {
+        Alert.alert("Sign in failed", error.message);
+      }
+    } catch (err) {
+      Alert.alert("Sign in failed", "Something went wrong while signing in.");
+    }
+  };
+
   return (
-    <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-      <LinearGradient style={{ flex: 1 }} colors={["#340C4C", "#EB7363"]}>
-        <StatusBar barStyle={"light-content"} />
+    <LinearGradient style={{ flex: 1 }} colors={["#340C4C", "#EB7363"]}>
+      <StatusBar barStyle={"light-content"} />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
         <SafeAreaView>
           <View className="bg-white max-h-[78%] py-6 m-6 rounded-[48px] flex justify-center px-4">
             <Image
@@ -96,9 +102,21 @@ const index = () => {
           </View>
           <View className="flex flex-grow justify-center gap-4">
             <View className="flex-row justify-between w-1/2 self-center">
-              <LoginIcon image={require("@assets/apple-logo.png")} />
-              <LoginIcon image={require("@assets/facebook.png")} />
-              <LoginIcon image={require("@assets/google.png")} />
+              <LoginIcon
+                image={require("@assets/apple-logo.png")}
+                onPress={() => handleSocialLogin("apple")}
+                accessibilityLabel="Sign in with Apple"
+              />
+              <LoginIcon
+                image={require("@assets/facebook.png")}
+                onPress={() => handleSocialLogin("facebook")}
+                accessibilityLabel="Sign in with Facebook"
+              />
+              <LoginIcon
+                image={require("@assets/google.png")}
+                onPress={() => handleSocialLogin("google")}
+                accessibilityLabel="Sign in with Google"
+              />
             </View>
             <Text className="text-white text-center">
               Dont have an account?<Text> </Text>
@@ -108,10 +126,15 @@ const index = () => {
                 </Text>
               </Link>
             </Text>
+            <TouchableOpacity onPress={() => router.replace("/dashboard")} className="self-center mt-2">
+              <Text className="text-white text-sm underline opacity-70">
+                View dashboard without signing in
+              </Text>
+            </TouchableOpacity>
           </View>
         </SafeAreaView>
-      </LinearGradient>
-    </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </LinearGradient>
   );
 };
 

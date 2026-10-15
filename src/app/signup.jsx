@@ -4,98 +4,95 @@ import {
   SafeAreaView,
   Image,
   StatusBar,
-  TouchableWithoutFeedback,
-  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   TouchableOpacity,
+  Alert,
 } from "react-native";
-import React, { useContext, useState } from "react";
+import React, { useState } from "react";
 import "../../global.css";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import TextInputWithLogo from "@/components/TextInputWithLogo";
 import LoginIcon from "@/components/LoginIcon";
-import { Link, router, useNavigation } from "expo-router";
+import { Link, router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import { AuthContext } from "@/context/authContext";
-import * as ImagePicker from "expo-image-picker"; // ✅ added
+import { useAuth } from "@/context/authContext";
 
 const SignUp = () => {
-  const { setUser } = useContext(AuthContext);
+  const { signUp, signInWithOAuth } = useAuth();
+
   const [userData, setUserData] = useState({
     username: "",
     email: "",
     password: "",
   });
 
-  const [photo, setPhoto] = useState(null); // ✅ local photo state
+  const handleSignup = async () => {
+    if (!userData.username || !userData.email || !userData.password) {
+      Alert.alert("Missing fields", "Please complete all fields");
+      return;
+    }
 
-  // ✅ Image Picker
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-    });
-    if (!result.canceled) {
-      setPhoto(result.assets[0].uri);
+    try {
+      const { data, error } = await signUp(
+        userData.email,
+        userData.password,
+        userData.username
+      );
+
+      if (error) {
+        Alert.alert("Signup failed", error.message);
+        return;
+      }
+
+      const createdUser = data?.user;
+      const createdSession = data?.session;
+
+      if (!createdUser) {
+        Alert.alert("Signup failed", "No user was returned from Supabase");
+        return;
+      }
+
+      if (createdSession) {
+        Alert.alert("Success", "Account created successfully");
+        router.replace("/(tabs)/home");
+      } else {
+        Alert.alert(
+          "Check your email",
+          "Account created. Please verify your email before logging in."
+        );
+        router.replace("/");
+      }
+    } catch (err) {
+      Alert.alert(
+        "Error",
+        err?.message || "Something went wrong while creating your account"
+      );
     }
   };
 
-  const handleSignup = async () => {
-    //PRODUCTION CODE
-    // if (!userData.username || !userData.email || !userData.password) {
-    //   alert("Please complete all fields");
-    //   return;
-    // }
+  const handleSocialSignup = async (provider) => {
+    try {
+      const { error } = await signInWithOAuth(provider);
 
-    // const formData = new FormData();
-    // formData.append("username", userData.username);
-    // formData.append("email", userData.email);
-    // formData.append("password", userData.password);
-
-    // if (photo) {
-    //   const filename = photo.split("/").pop();
-    //   const match = /\.(\w+)$/.exec(filename ?? "");
-    //   const type = match ? `image/${match[1]}` : `image`;
-    //   formData.append("photo", { uri: photo, name: filename, type });
-    // }
-
-    // const response = await fetch(`http://0.0.0.0:8000/signup/`, {
-    //   method: "POST",
-    //   headers: {
-    //     Accept: "application/json",
-    //     "Content-Type": "multipart/form-data",
-    //   },
-    //   body: formData,
-    // });
-
-    // switch (response.status) {
-    //   case 409:
-    //     alert("This email or username already exists");
-    //     break;
-    //   case 400:
-    //     alert("An error occured");
-    //     break;
-    //   case 201:
-    //     const data = await response.json();
-    //     setUser({
-    //       id: data.id,
-    //       username: data.username,
-    //       email: data.email,
-    //       photo: data.photo ?? null, // ✅ store server photo url
-    //     });
-    //     router.replace("/home");
-    //     break;
-    // }
-
-    //DEV CODE
-    router.replace("/home");
+      if (error) {
+        Alert.alert("Signup failed", error.message);
+      }
+    } catch (err) {
+      Alert.alert(
+        "Signup failed",
+        "Something went wrong while creating your account."
+      );
+    }
   };
 
   return (
-    <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-      <LinearGradient style={{ flex: 1 }} colors={["#340C4C", "#EB7363"]}>
-        <StatusBar barStyle={"light-content"} />
+    <LinearGradient style={{ flex: 1 }} colors={["#340C4C", "#EB7363"]}>
+      <StatusBar barStyle={"light-content"} />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
         <SafeAreaView>
           <View className="bg-white max-h-[78%] py-6 m-6 rounded-[48px] flex justify-center px-4">
             <Image
@@ -109,6 +106,7 @@ const SignUp = () => {
             <Text className="text-xl font-semibold text-center">
               Create an Account
             </Text>
+
             <View className="gap-4 my-12">
               <TextInputWithLogo
                 data={userData}
@@ -132,24 +130,6 @@ const SignUp = () => {
                 placeholder={"Enter your password"}
                 id={"password"}
               />
-
-              {/* ✅ Photo Upload Button */}
-              <TouchableOpacity
-                onPress={pickImage}
-                className="bg-gray-200 w-2/3 self-center rounded-full px-6 py-3 mt-4"
-              >
-                <Text className="text-center text-brand-navy">
-                  {photo ? "Change Photo" : "Upload Photo (Optional)"}
-                </Text>
-              </TouchableOpacity>
-
-              {/* ✅ Show selected photo preview */}
-              {photo && (
-                <Image
-                  source={{ uri: photo }}
-                  className="w-24 h-24 rounded-full self-center mt-3"
-                />
-              )}
             </View>
 
             <TouchableOpacity
@@ -164,9 +144,21 @@ const SignUp = () => {
 
           <View className="flex flex-grow justify-center gap-4">
             <View className="flex-row justify-between w-1/2 self-center">
-              <LoginIcon image={require("@assets/apple-logo.png")} />
-              <LoginIcon image={require("@assets/facebook.png")} />
-              <LoginIcon image={require("@assets/google.png")} />
+              <LoginIcon
+                image={require("@assets/apple-logo.png")}
+                onPress={() => handleSocialSignup("apple")}
+                accessibilityLabel="Sign up with Apple"
+              />
+              <LoginIcon
+                image={require("@assets/facebook.png")}
+                onPress={() => handleSocialSignup("facebook")}
+                accessibilityLabel="Sign up with Facebook"
+              />
+              <LoginIcon
+                image={require("@assets/google.png")}
+                onPress={() => handleSocialSignup("google")}
+                accessibilityLabel="Sign up with Google"
+              />
             </View>
             <Text className="text-white text-center">
               Already have an account?{" "}
@@ -178,8 +170,8 @@ const SignUp = () => {
             </Text>
           </View>
         </SafeAreaView>
-      </LinearGradient>
-    </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </LinearGradient>
   );
 };
 
